@@ -1,0 +1,25 @@
+[project]
+name = "smart-code-reviewer-y7b4ip"
+version = "0.1.0"
+description = 'smart-code-reviewer'
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.116.1",
+    "uvicorn>=0.35.0",
+    "deepagents>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "langchain-litellm>=0.6.4",
+    "langchain-core>=0.3.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "ag-ui-langgraph>=0.0.34",
+    "bedrock-agentcore",
+    "aws-opentelemetry-distro>=0.10.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

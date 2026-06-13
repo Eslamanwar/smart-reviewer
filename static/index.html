@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>smart-code-reviewer</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --fg: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  header .dot.ok { background: var(--green); } header .dot.bad { background: var(--red); }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field.grow { flex: 1; min-width: 320px; }
+  input {
+    background: var(--panel); border: 1px solid var(--border); color: var(--fg);
+    padding: 8px 10px; border-radius: 6px; font-size: 14px; width: 100%;
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0; padding: 9px 16px;
+    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: var(--panel); border: 1px solid var(--border); color: var(--fg); }
+  .status { font-size: 13px; color: var(--muted); margin-bottom: 12px; min-height: 18px; }
+  .status .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 10px; margin-right: 6px;
+    background: var(--panel); border: 1px solid var(--border); font-size: 12px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 900px) { .grid.split { grid-template-columns: 1fr 360px; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .panel .head {
+    padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px;
+    color: var(--muted); display: flex; justify-content: space-between; align-items: center;
+  }
+  #review { padding: 4px 18px 18px; min-height: 200px; word-break: break-word; font-size: 14px; line-height: 1.6; }
+  /* Rendered-markdown element styles (scoped to the review panel). */
+  #review h1, #review h2, #review h3, #review h4 { line-height: 1.3; margin: 18px 0 8px; font-weight: 600; }
+  #review h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  #review h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+  #review h3 { font-size: 15px; } #review h4 { font-size: 14px; color: var(--muted); }
+  #review p { margin: 8px 0; }
+  #review ul, #review ol { margin: 8px 0; padding-left: 24px; }
+  #review li { margin: 3px 0; }
+  #review a { color: var(--accent); text-decoration: none; }
+  #review a:hover { text-decoration: underline; }
+  #review strong { font-weight: 600; color: #fff; }
+  #review code {
+    background: #2b3138; padding: 1.5px 5px; border-radius: 4px; font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  #review pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; overflow-x: auto; margin: 10px 0;
+  }
+  #review pre code { background: none; padding: 0; font-size: 12.5px; line-height: 1.5; }
+  #review blockquote {
+    margin: 10px 0; padding: 2px 14px; border-left: 3px solid var(--border); color: var(--muted);
+  }
+  #review hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+  #review table { border-collapse: collapse; margin: 10px 0; display: block; overflow-x: auto; }
+  #review th, #review td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  #review th { background: #1c2128; font-weight: 600; }
+  #review .rawmd {
+    white-space: pre-wrap; background: none; border: 0; padding: 0; margin: 0;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg);
+  }
+  #events {
+    padding: 8px; max-height: 520px; overflow: auto;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .evt { padding: 2px 6px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  .evt .t { color: var(--accent); }
+  .evt.thinking .t { color: var(--yellow); }
+  .evt.tool .t { color: var(--green); }
+  .evt.error .t, .evt.error { color: var(--red); }
+  .hidden { display: none; }
+  label.toggle { font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="health"></span>
+  <h1>smart-code-reviewer</h1>
+  <span style="color:var(--muted);font-size:12px" id="healthText">checking…</span>
+</header>
+
+<main>
+  <div class="controls">
+    <div class="field grow">
+      <label for="pr">PR reference (URL, <code>owner/repo#N</code>, …)</label>
+      <input id="pr" placeholder="https://github.com/langchain-ai/deepagents/pull/3936" />
+    </div>
+    <div class="field">
+      <label for="email">user_email</label>
+      <input id="email" style="width:220px" />
+    </div>
+    <button id="run">Review</button>
+    <button id="stop" class="secondary hidden">Stop</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="grid split">
+    <div class="panel">
+      <div class="head">
+        <span>Review</span>
+        <span style="display:flex;gap:6px">
+          <button class="secondary" id="raw" style="padding:3px 10px;font-size:12px">Raw</button>
+          <button class="secondary" id="copy" style="padding:3px 10px;font-size:12px">Copy</button>
+        </span>
+      </div>
+      <div id="review"></div>
+    </div>
+    <div class="panel">
+      <div class="head">
+        <span>Event stream</span>
+        <label class="toggle"><input type="checkbox" id="showThinking" /> show thinking</label>
+      </div>
+      <div id="events"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const reviewEl = $("review"), eventsEl = $("events"), statusEl = $("status");
+let controller = null;
+
+// Prefill email from a sensible default.
+$("email").value = "you@org.com";
+
+// Health check.
+fetch("/ping").then(r => r.json()).then(d => {
+  $("health").className = "dot ok";
+  $("healthText").textContent = d.agent ? `${d.agent} · healthy` : "healthy";
+}).catch(() => {
+  $("health").className = "dot bad";
+  $("healthText").textContent = "unreachable";
+});
+
+function setStatus(html) { statusEl.innerHTML = html; }
+function logEvent(type, detail) {
+  const isThinking = /THINKING|REASONING/.test(type);
+  if (isThinking && !$("showThinking").checked) return;
+  const div = document.createElement("div");
+  div.className = "evt" + (isThinking ? " thinking" : /TOOL/.test(type) ? " tool" : type === "ERROR" ? " error" : "");
+  div.innerHTML = `<span class="t">${type}</span>` + (detail ? " " + escapeHtml(detail) : "");
+  eventsEl.appendChild(div);
+  eventsEl.scrollTop = eventsEl.scrollHeight;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+// ── Minimal, dependency-free Markdown → HTML renderer ───────────────────────
+// Covers what the reviewer emits: headings, bold/italic, inline + fenced code,
+// lists, blockquotes, tables, links, hr. Text is HTML-escaped before any tags
+// are added, so model output can't inject markup.
+function inlineMd(text) {
+  // Split out `code spans` first so we never format inside them.
+  const parts = [];
+  let last = 0, m;
+  const codeRe = /`([^`]+)`/g;
+  while ((m = codeRe.exec(text)) !== null) {
+    parts.push({ code: false, v: text.slice(last, m.index) });
+    parts.push({ code: true, v: m[1] });
+    last = m.index + m[0].length;
+  }
+  parts.push({ code: false, v: text.slice(last) });
+
+  return parts.map(p => {
+    if (p.code) return `<code>${escapeHtml(p.v)}</code>`;
+    let s = escapeHtml(p.v);
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      (_, t, u) => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener">${t}</a>`);
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    s = s.replace(/\n/g, "<br>");
+    return s;
+  }).join("");
+}
+
+function renderMarkdown(src) {
+  const lines = String(src).replace(/\r\n?/g, "\n").split("\n");
+  let html = "", i = 0;
+  const blockStart = (l) =>
+    /^(```|~~~)/.test(l) || /^#{1,6}\s/.test(l) || /^\s*>\s?/.test(l) ||
+    /^(\s*)([-*+]|\d+\.)\s+/.test(l) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(l) || /^\s*$/.test(l);
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    const fence = line.match(/^(```|~~~)(.*)$/);
+    if (fence) {
+      const marker = fence[1], lang = fence[2].trim();
+      i++;
+      const code = [];
+      while (i < lines.length && !lines[i].startsWith(marker)) { code.push(lines[i]); i++; }
+      i++; // consume closing fence (or run off the end while still streaming)
+      html += `<pre><code${lang ? ` class="lang-${escapeAttr(lang)}"` : ""}>${escapeHtml(code.join("\n"))}</code></pre>`;
+      continue;
+    }
+    if (/^\s*$/.test(line)) { i++; continue; }
+
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { const lvl = h[1].length; html += `<h${lvl}>${inlineMd(h[2].trim())}</h${lvl}>`; i++; continue; }
+
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { html += "<hr>"; i++; continue; }
+
+    if (/^\s*>\s?/.test(line)) {
+      const quote = [];
+      while (i < lines.length && /^\s*>\s?/.test(lines[i])) { quote.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
+      html += `<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`;
+      continue;
+    }
+
+    // GitHub table: a row with pipes followed by a |---|---| separator line.
+    if (line.includes("|") && i + 1 < lines.length &&
+        /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes("-")) {
+      const row = (r) => r.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(c => c.trim());
+      const headers = row(line);
+      i += 2;
+      let body = "";
+      while (i < lines.length && lines[i].includes("|") && !/^\s*$/.test(lines[i])) {
+        const cells = row(lines[i]);
+        body += "<tr>" + headers.map((_, ci) => `<td>${inlineMd(cells[ci] || "")}</td>`).join("") + "</tr>";
+        i++;
+      }
+      html += `<table><thead><tr>${headers.map(c => `<th>${inlineMd(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>`;
+      continue;
+    }
+
+    const isOl = /^(\s*)\d+\.\s+/.test(line);
+    if (isOl || /^(\s*)[-*+]\s+/.test(line)) {
+      const tag = isOl ? "ol" : "ul";
+      const re = isOl ? /^(\s*)\d+\.\s+(.*)$/ : /^(\s*)[-*+]\s+(.*)$/;
+      let items = "";
+      while (i < lines.length && re.test(lines[i])) {
+        let content = lines[i].match(re)[2];
+        i++;
+        // Fold indented continuation lines into the same item.
+        while (i < lines.length && /^\s+\S/.test(lines[i]) && !/^(\s*)([-*+]|\d+\.)\s+/.test(lines[i])) {
+          content += "\n" + lines[i].trim(); i++;
+        }
+        items += `<li>${inlineMd(content)}</li>`;
+      }
+      html += `<${tag}>${items}</${tag}>`;
+      continue;
+    }
+
+    // Paragraph — gather until the next block-level construct.
+    const para = [];
+    while (i < lines.length && !blockStart(lines[i])) { para.push(lines[i]); i++; }
+    if (para.length) html += `<p>${inlineMd(para.join("\n"))}</p>`;
+  }
+  return html;
+}
+
+// Accumulated raw markdown + render scheduling (throttle repaints during stream).
+let reviewMarkdown = "";
+let rawMode = false;
+let renderScheduled = false;
+function paintReview() {
+  reviewEl.innerHTML = rawMode
+    ? `<pre class="rawmd">${escapeHtml(reviewMarkdown)}</pre>`
+    : renderMarkdown(reviewMarkdown);
+}
+function scheduleRender() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => { renderScheduled = false; paintReview(); });
+}
+
+async function run() {
+  const pr = $("pr").value.trim() || $("pr").placeholder;
+  const email = $("email").value.trim() || "anon@org.com";
+
+  reviewMarkdown = "";
+  reviewEl.innerHTML = "";
+  eventsEl.textContent = "";
+  $("run").disabled = true;
+  $("stop").classList.remove("hidden");
+  setStatus(`<span class="pill">connecting…</span>`);
+
+  controller = new AbortController();
+  const body = {
+    thread_id: "ui-" + Math.floor(performance.now()),
+    run_id: "r1",
+    messages: [{ id: "m1", role: "user", content: "Review " + pr }],
+    tools: [], context: [], state: {},
+    forwarded_props: { user_email: email },
+  };
+
+  let eventCount = 0, charCount = 0;
+  try {
+    const resp = await fetch("/invocations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    setStatus(`<span class="pill">streaming…</span>`);
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      // SSE frames are separated by a blank line.
+      let sep;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        for (const line of frame.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (!payload) continue;
+          let ev;
+          try { ev = JSON.parse(payload); } catch { continue; }
+          eventCount++;
+          handleEvent(ev);
+          if (ev.type === "TEXT_MESSAGE_CONTENT" && ev.delta) charCount += ev.delta.length;
+          setStatus(`<span class="pill">${eventCount} events</span><span class="pill">${charCount} chars</span>`);
+        }
+      }
+    }
+    setStatus(`<span class="pill" style="border-color:var(--green);color:var(--green)">done</span>` +
+              `<span class="pill">${eventCount} events</span><span class="pill">${charCount} chars</span>`);
+  } catch (err) {
+    if (err.name === "AbortError") {
+      setStatus(`<span class="pill">stopped</span>`);
+    } else {
+      logEvent("ERROR", err.message);
+      setStatus(`<span class="pill" style="border-color:var(--red);color:var(--red)">error</span> ${escapeHtml(err.message)}`);
+    }
+  } finally {
+    $("run").disabled = false;
+    $("stop").classList.add("hidden");
+    controller = null;
+  }
+}
+
+function handleEvent(ev) {
+  switch (ev.type) {
+    case "TEXT_MESSAGE_CONTENT":
+      if (ev.delta) { reviewMarkdown += ev.delta; scheduleRender(); }
+      break;
+    case "THINKING_TEXT_MESSAGE_CONTENT":
+    case "REASONING_MESSAGE_CONTENT":
+      logEvent(ev.type, ev.delta || "");
+      break;
+    case "TOOL_CALL_START":
+      logEvent(ev.type, ev.tool_call_name || ev.toolCallName || "");
+      break;
+    case "TOOL_CALL_ARGS":
+      logEvent(ev.type, ev.delta || "");
+      break;
+    case "TOOL_CALL_END":
+    case "TOOL_CALL_RESULT":
+      logEvent(ev.type, "");
+      break;
+    case "TEXT_MESSAGE_START":
+    case "TEXT_MESSAGE_END":
+    case "RUN_STARTED":
+    case "RUN_FINISHED":
+      logEvent(ev.type, "");
+      break;
+    default:
+      logEvent(ev.type || "RAW", "");
+  }
+}
+
+$("run").addEventListener("click", run);
+$("stop").addEventListener("click", () => controller && controller.abort());
+$("pr").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+$("copy").addEventListener("click", () => navigator.clipboard.writeText(reviewMarkdown));
+$("raw").addEventListener("click", () => {
+  rawMode = !rawMode;
+  $("raw").textContent = rawMode ? "Rendered" : "Raw";
+  paintReview();
+});
+</script>
+</body>
+</html>

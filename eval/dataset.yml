@@ -1,0 +1,34 @@
+# LLM-as-judge eval dataset.
+#
+# Each entry is a real, merged PR that received a SUBSTANTIVE HUMAN review. The
+# runner treats the human review as ground truth and asks an LLM judge how well
+# this agent's review covers what the human caught (recall) plus the agent's
+# overall review quality.
+#
+# `note`/`dimension` are for our reference only — they are NOT shown to the judge
+# (so the judge can't be biased toward the answer; it must read the raw human
+# review itself).
+
+- pr: https://github.com/psf/requests/pull/3789
+  dimension: correctness
+  note: >
+    Human reviewers (Lukasa, sigmavirus24) caught a real correctness bug —
+    `__name__` resolves to `requests.models`, not `requests.packages` — plus a
+    possibly-breaking-behavior concern. Small diff (3 files, +28/-17), all-human
+    reviewers: cleanest signal for "did the agent find the bug?".
+
+- pr: https://github.com/pallets/flask/pull/2326
+  dimension: maintainability
+  note: >
+    Reviewer davidism gave concrete maintainability/refactor feedback: simplify
+    the regex to `\w+`, `rstrip(' ,')` ordering, and "extract this to a common
+    function." Medium diff (3 files, +113/-30), all-human: tests a non-bug
+    review dimension.
+
+- pr: https://github.com/langchain-ai/langchain/pull/32236
+  dimension: correctness+security
+  note: >
+    Human (mdrxy) caught a stray `.zprofile` committed by accident; a bot
+    reviewer (Copilot) flagged a security concern (raw content in error
+    messages) and import-location issues. Mixed human + AI reviewers — useful for
+    "does the agent flag accidental files and the security note?".

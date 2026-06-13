@@ -1,0 +1,15 @@
+# Local secrets / environment — never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Eval scorecards (regenerated per run)
+eval/results/
+note.md

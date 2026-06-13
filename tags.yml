@@ -1,0 +1,10 @@
+name: smart-code-reviewer-y7b4ip
+display_name: smart-code-reviewer
+description: smart-code-reviewer
+team: mlops
+domain: user-built
+owner: eslam.mohammed
+framework: langgraph
+protocol: agui
+llm_model: google/gemini-2.5-flash
+tier: production
